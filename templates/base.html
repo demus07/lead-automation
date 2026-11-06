@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Leads{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <a class="brand" href="{{ url_for('dashboard') }}">Leads</a>
+    <nav>
+      <a href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}class="on"{% endif %}>
+        Dashboard{% if pending_count %} <span class="pill">{{ pending_count }}</span>{% endif %}</a>
+      <a href="{{ url_for('leads') }}" {% if request.endpoint in ('leads', 'lead') %}class="on"{% endif %}>Leads</a>
+      <a href="{{ url_for('settings') }}" {% if request.endpoint == 'settings' %}class="on"{% endif %}>Settings</a>
+    </nav>
+    <form method="post" action="{{ url_for('run') }}">
+      <button {% if state.running %}disabled{% endif %}>{{ 'Running…' if state.running else 'Find leads now' }}</button>
+    </form>
+  </header>
+  <main>
+    {% for m in get_flashed_messages() %}<p class="flash">{{ m }}</p>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    // Copy-to-clipboard for DM drafts.
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-copy]");
+      if (!b) return;
+      navigator.clipboard.writeText(document.getElementById(b.dataset.copy).value);
+      b.textContent = "Copied";
+    });
+  </script>
+</body>
+</html>

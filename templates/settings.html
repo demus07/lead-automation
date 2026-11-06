@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<form method="post" class="settings">
+  <h2>Who you're after</h2>
+  <label>Target <small>one line, in your words; it shapes every draft</small>
+    <input name="target_description" value="{{ s.target_description }}" placeholder="Independent dental practices in Manchester"></label>
+  <label>Pitch
+    <select name="service_focus">
+      {% for v, t in [('any', 'Whichever fits each lead'), ('website', 'Digital Experiences only'), ('systems', 'Intelligent Systems only')] %}
+      <option value="{{ v }}" {% if s.service_focus == v %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select></label>
+  <label>Sources <small><code>osm</code> = local businesses (OpenStreetMap), <code>yc</code> = YC startups, <code>hn</code> = HN “Who is hiring”</small>
+    <input name="sources" value="{{ s.sources }}"></label>
+
+  <h2>Local businesses (osm)</h2>
+  <label>Cities <small>comma-separated, include the country: Manchester UK, Leeds UK</small>
+    <input name="cities" value="{{ s.cities }}"></label>
+  <label>Categories <small>comma-separated. Available: {{ categories|join(', ') }}. Raw OSM tags like <code>office=tax_advisor</code> also work.</small>
+    <input name="categories" value="{{ s.categories }}"></label>
+
+  <h2>Startups (yc, hn)</h2>
+  <label>Keywords <input name="keywords" value="{{ s.keywords }}"></label>
+  <label>Locations <small>e.g. London, Remote</small> <input name="locations" value="{{ s.locations }}"></label>
+  <div class="row">
+    <label>Min team size <input type="number" name="min_team" value="{{ s.min_team }}" min="0"></label>
+    <label>Max team size <input type="number" name="max_team" value="{{ s.max_team }}" min="0"></label>
+  </div>
+
+  <h2>Running</h2>
+  <div class="row">
+    <label>New leads per run <input type="number" name="leads_per_run" value="{{ s.leads_per_run }}" min="1" max="100"></label>
+    <label>Minimum fit score <input type="number" name="min_score" value="{{ s.min_score }}" min="0" max="100"></label>
+  </div>
+  <div class="row">
+    <label>Automatic runs
+      <select name="auto_run"><option {% if s.auto_run == 'off' %}selected{% endif %}>off</option>
+        <option {% if s.auto_run == 'on' %}selected{% endif %}>on</option></select></label>
+    <label>Every (hours) <input type="number" name="interval_hours" value="{{ s.interval_hours }}" min="1"></label>
+    <label>Max emails per day <input type="number" name="daily_send_limit" value="{{ s.daily_send_limit }}" min="1"></label>
+    <label>Follow up after (days) <input type="number" name="follow_up_days" value="{{ s.follow_up_days }}" min="1"></label>
+  </div>
+
+  <h2>Your messages</h2>
+  <div class="row">
+    <label>Your name <input name="sender_name" value="{{ s.sender_name }}"></label>
+    <label>Studio <input name="studio_name" value="{{ s.studio_name }}"></label>
+    <label>Studio URL <input name="studio_url" value="{{ s.studio_url }}"></label>
+  </div>
+  <label>Website pitch <small>used when their site is the problem</small>
+    <textarea name="website_pitch" rows="2">{{ s.website_pitch }}</textarea></label>
+  <label>Systems pitch <small>used when team knowledge / workflows are the problem</small>
+    <textarea name="systems_pitch" rows="2">{{ s.systems_pitch }}</textarea></label>
+  <label>Signature <textarea name="signature" rows="2">{{ s.signature }}</textarea></label>
+  <label>Opt-out line <small>added to every email</small> <input name="opt_out_line" value="{{ s.opt_out_line }}"></label>
+  <label>Postal address <small>added to every email; US law requires one on commercial email</small>
+    <input name="postal_address" value="{{ s.postal_address }}"></label>
+  <button class="primary">Save</button>
+</form>
+
+<h2>Connections <small class="muted">set in <code>.env</code></small></h2>
+<ul class="small">
+  <li>Email sending (SMTP): {{ 'connected' if smtp_ok else 'not set up' }}</li>
+  <li>LLM for drafts: {{ llm_model if llm_ok else 'not set up — using the template' }}</li>
+</ul>
+
+<h2>Do not contact</h2>
+<form method="post" action="{{ url_for('block') }}" class="row">
+  <input name="value" placeholder="domain.com or name@domain.com"><button>Add</button>
+</form>
+<ul class="small">
+  {% for v in blocked %}<li>{{ v }}
+    <form method="post" action="{{ url_for('unblock') }}" class="inline"><input type="hidden" name="value" value="{{ v }}"><button class="link">remove</button></form></li>
+  {% endfor %}
+</ul>
+{% endblock %}

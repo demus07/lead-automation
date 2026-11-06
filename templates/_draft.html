@@ -1,0 +1,25 @@
+{# One draft awaiting approval. Expects `m` (message) and optionally `show_lead`. #}
+<form class="draft" method="post" action="{{ url_for('approve', msg_id=m.id) }}">
+  <div class="draft-head">
+    {% if show_lead %}<a href="{{ url_for('lead', lead_id=m.lead_id) }}"><strong>{{ m.lead_name }}</strong></a>
+      <span class="muted">{{ m.lead_domain }}</span>{% endif %}
+    <span class="tag">{{ 'follow-up' if m.kind == 'follow_up' else m.channel }}</span>
+    {% if m.drafted_by == 'template' %}<span class="tag warn">template, not AI</span>{% endif %}
+    <span class="muted">to</span>
+    {% if m.channel == 'dm' %}<a href="{{ m.recipient }}" target="_blank" rel="noopener">{{ m.recipient }}</a>
+    {% else %}{{ m.recipient }}{% endif %}
+  </div>
+  {% if m.channel == 'email' %}<input name="subject" value="{{ m.subject or '' }}" aria-label="Subject">{% endif %}
+  <textarea name="body" id="body-{{ m.id }}" rows="10" aria-label="Message">{{ m.body }}</textarea>
+  <div class="row">
+    {% if m.channel == 'email' %}
+      <button class="primary">Approve &amp; send</button>
+    {% else %}
+      <button type="button" data-copy="body-{{ m.id }}">Copy</button>
+      <a class="button" href="{{ m.recipient }}" target="_blank" rel="noopener">Open profile</a>
+      <button class="primary">I sent it</button>
+    {% endif %}
+    <button formaction="{{ url_for('redraft', lead_id=m.lead_id) }}">Redraft</button>
+    <button formaction="{{ url_for('reject', msg_id=m.id) }}" class="quiet">Reject</button>
+  </div>
+</form>

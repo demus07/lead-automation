@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="pipeline">
+  {% for st in ['new', 'drafted', 'contacted', 'replied', 'meeting', 'won'] %}
+    <a href="{{ url_for('leads', status=st) }}"><b>{{ counts.get(st, 0) }}</b><span>{{ st }}</span></a>
+  {% endfor %}
+</section>
+
+{% if not smtp_ok or not llm_ok %}
+<p class="notice">
+  {% if not smtp_ok %}Email sending isn't set up (add <code>SMTP_*</code> to <code>.env</code>). {% endif %}
+  {% if not llm_ok %}No LLM configured — drafts use a plain template. {% endif %}
+  <a href="{{ url_for('settings') }}">Settings</a>
+</p>
+{% endif %}
+
+<h2>Waiting for approval <span class="muted">{{ queue|length }} · sent today {{ sent_today }}/{{ settings.daily_send_limit }}</span></h2>
+{% for m in queue %}
+  {% set show_lead = true %}{% include "_draft.html" %}
+{% else %}
+  <p class="muted">Nothing to approve. Click “Find leads now”, or turn on automatic runs in Settings.</p>
+{% endfor %}
+
+{% if follow_ups %}
+<h2>Follow-ups due</h2>
+<table>
+  {% for l in follow_ups %}
+  <tr><td><a href="{{ url_for('lead', lead_id=l.id) }}">{{ l.name }}</a></td><td>{{ l.status }}</td>
+      <td class="muted">{{ l.follow_up }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>Activity <span class="muted">{% if settings.auto_run == 'on' %}auto-run every {{ settings.interval_hours }}h{% else %}auto-run off{% endif %}</span></h2>
+<pre class="log">{% for line in state.log %}{{ line }}
+{% else %}No runs yet this session.{% endfor %}</pre>
+{% endblock %}

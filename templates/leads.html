@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Leads{% endblock %}
+{% block content %}
+<div class="filters">
+  <a href="{{ url_for('leads') }}" {% if not status %}class="on"{% endif %}>all</a>
+  {% for st in stages %}{% if counts.get(st) %}
+    <a href="{{ url_for('leads', status=st) }}" {% if status == st %}class="on"{% endif %}>{{ st }} {{ counts[st] }}</a>
+  {% endif %}{% endfor %}
+</div>
+
+<table>
+  <thead><tr><th>Company</th><th>Stage</th><th>Fit</th><th>Problem</th><th>Contact</th><th>Source</th></tr></thead>
+  <tbody>
+  {% for l in leads %}
+    {% set r = l.research %}
+    <tr>
+      <td><a href="{{ url_for('lead', lead_id=l.id) }}">{{ l.name }}</a><br><span class="muted">{{ l.domain }}</span></td>
+      <td>{{ l.status }}</td>
+      <td>{% if r %}{{ r.recommended }} {{ r.scores[r.recommended] }}{% endif %}</td>
+      <td class="clip">{% if r and r.problems %}{{ r.problems[0].problem }}{% else %}<span class="muted">{{ l.note or '' }}</span>{% endif %}</td>
+      <td class="clip">{{ l.contacts.best_email or l.contacts.best_dm or '' if l.contacts else '' }}</td>
+      <td class="muted">{{ l.source or '' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">No leads yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Add companies by hand</h2>
+<form method="post" action="{{ url_for('add_leads') }}" class="stack">
+  <textarea name="urls" rows="3" placeholder="acme.com, https://example.io …"></textarea>
+  <label><input type="checkbox" name="process" checked> Research them now</label>
+  <button>Add</button>
+</form>
+{% endblock %}

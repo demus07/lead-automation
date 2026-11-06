@@ -1,53 +1,76 @@
-# Agency Growth Engine
+# Lead automation
 
-AI-assisted lead discovery, website & business research, opportunity qualification and outreach drafting
-for a digital agency — with a **mandatory human approval step**. The application never sends email:
-approval creates an *unsent* draft in your Gmail or Outlook mailbox, and you send it yourself.
+A small, local dashboard that finds companies, works out what's wrong (their website, or how their team
+works), finds who to contact, drafts a message, and **waits for your approval** before anything is sent.
+It also works as a light CRM for everything that happens after you hit send.
 
 ```
-discover → research → find contacts → score (Website / Company Brain, independently)
-        → draft → quality gate → HUMAN APPROVAL → unsent mailbox draft → reply tracking → analytics
+find leads → research site → find email / profile → draft → you approve → send
+           → replies, opt-outs and bounces update the CRM → one follow-up → you approve
 ```
 
-## What's inside
+Everything runs on your machine with free tools: Flask, SQLite, no paid APIs.
 
-| Area | Implementation |
-|---|---|
-| Backend | FastAPI, SQLAlchemy 2, Pydantic 2, Alembic, PostgreSQL 16 (JSONB, UUIDs) |
-| Jobs | Celery + Redis, DB-driven scheduler (cron per workflow), retries, pause/resume, idempotency, recovery |
-| Frontend | Next.js 15, TypeScript, Tailwind, shadcn/ui |
-| Discovery | YC directory, Wikidata, HN “Who is hiring”, RSS, Brave / Tavily / SerpAPI / SearXNG (optional), CSV import, Company Brain connectors |
-| Research | robots.txt-aware crawler (httpx + BeautifulSoup, optional Playwright), measurable site audit, careers/news signals, contact extraction |
-| AI | Provider-independent: OpenAI-compatible APIs (OpenAI, Azure gateways, OpenRouter, Ollama, vLLM…) or Anthropic Claude. 9 agents with schema-validated JSON, evidence validation, token/cost tracking, budgets |
-| Email | Gmail API & Microsoft Graph via OAuth2 — draft creation + reply metadata only (no send scope on Outlook; no send calls anywhere) |
-| Compliance | Suppression list, opt-out detection, audit log, retention, data export & erasure, prompt-injection defences |
-
-## Quick start (Docker)
+## Run it
 
 ```bash
-cp .env.example .env            # set SECRET_KEY, ENCRYPTION_KEY, BOOTSTRAP_ADMIN_* at minimum
-docker compose up -d --build
-open http://localhost:3000       # sign in with BOOTSTRAP_ADMIN_EMAIL / PASSWORD
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m playwright install chromium
+cp .env.example .env        # fill in SMTP and an LLM
+.venv/bin/python check.py   # tests every connection; sends nothing
+.venv/bin/python app.py     # http://localhost:5050
 ```
 
-Then follow the onboarding wizard (agency profile → AI provider → search provider → email account).
-Without an LLM or search API key the app runs in a clearly labelled **limited mode**.
+Then open **Settings**, set your keywords, name and pitches, and click **Find leads now**.
 
-## Documentation
+## How each step works
 
-* [Architecture](docs/ARCHITECTURE.md) — components, database design, state machine, scoring, security model
-* [Installation](docs/INSTALLATION.md) — local development and Docker
-* [Deployment](docs/DEPLOYMENT.md) — production checklist, reverse proxy, scaling, monitoring
-* [Backup & recovery](docs/BACKUP_RECOVERY.md)
-* [Integration configuration](docs/INTEGRATIONS.md) — LLMs, search providers, Gmail, Outlook, Company Brain connectors
-* [User manual](docs/USER_MANUAL.md)
-* [API](docs/API.md) — plus live OpenAPI at `/api/docs`
-* [Security & compliance](docs/SECURITY.md)
-* [Acceptance tests](docs/ACCEPTANCE_TESTS.md) — the 20 required tests and where each is verified
+| Step | How | Cost |
+|---|---|---|
+| Find leads | OpenStreetMap for local businesses by category and city (chains are filtered out where tagged). YC directory (with team-size filter) and HN “Who is hiring” for startups. You can also paste domains. | free, no key |
+| Research | Opens the homepage in a headless browser at phone size, then reads about / team / contact / careers pages (respects robots.txt). Bot walls and empty pages are skipped, not reported as problems. | free |
+| Fit | Website: sideways scrolling on phones, no call to action on the first screen, no contact path, placeholder text, stale ©, slow load, template builders, dated technology, no reviews. Systems: operational job titles on their careers page, many open roles, stated remote or multi-office teams, team size. Each problem adds its weight (×10) to a 0–100 score. Search-hygiene items barely score and are never mentioned to a prospect. | free |
+| Contacts | Emails from visible text, mailto links and OpenStreetMap, plus social links. A person's address beats `hello@`; `support@`, `jobs@` etc. are skipped. Addresses are never guessed. Good fits with no contact go to `needs_contact`. | free |
+| Draft | Any OpenAI-compatible LLM, given the problems and their site text. Every draft is checked by plain rules (length, banned phrases, invented numbers, links, unsupported names) and sent back for fixing up to twice. If it still fails, or no LLM is set, you get a template labelled “template, not AI”. | free tier |
+| Send | Email over SMTP (a Gmail App Password works). DMs have no free, allowed API: click **Copy**, **Open profile**, send it yourself, then **I sent it**. | free |
+| Replies | Each run reads your inbox over IMAP, read-only. Replies move the lead to `replied` with their words as a note. Opt-outs go on the do-not-contact list. Bounces block the address. Out-of-office mail is ignored. | free |
+| Follow-up | One follow-up, in the same thread, drafted after the set number of days if there's no reply. It waits for approval too. | free |
 
-## Tests
+## The dashboard
 
-```bash
-make dev-infra && make test        # automated suite (mocked providers; CI-safe)
-make test-live                     # tests against real public sources
+- **Dashboard**: pipeline counts, the approval queue (edit the subject and body inline, then approve, redraft or reject), follow-ups due, and the activity log.
+- **Leads**: every company, filterable by stage. Add domains by hand here.
+- **Lead page**: problems found with sources, contacts, the draft, sent messages, notes, stage and follow-up date.
+- **Settings**: search keywords and sources, automatic runs (every N hours), daily email limit, minimum fit score, your pitches and signature, and the do-not-contact list.
+
+Stages: `new → researched → drafted → contacted → replied → meeting → won / lost` (or `needs_contact` / `skipped` / `error`).
+Replies update stages by themselves. `meeting`, `won` and `lost` are yours to set.
+
+Most businesses have decent sites, so expect only a fraction of leads to become drafts (1 in 8 in the first test).
+Set **New leads per run** with that in mind; each lead takes 10 to 20 seconds.
+
+Automatic runs only happen while `app.py` is running and the computer is awake.
+
+## Safety rails
+
+Nothing is sent without your click. There's a daily send cap, a first message never goes to an address
+already contacted, and the do-not-contact list (domains or addresses) is checked before every send.
+Every email carries your opt-out line and postal address.
+
+## Files
+
+```
+app.py              routes
+leads/db.py         SQLite: leads, messages, notes, settings, do-not-contact
+check.py            tests every connection
+leads/discover.py   OpenStreetMap, YC, HN, manual add
+leads/fetch.py      polite HTTP (robots.txt, user agent)
+leads/render.py     headless browser at phone size
+leads/research.py   crawl, checks, problems, scores
+leads/contacts.py   emails, socials, MX check
+leads/draft.py      LLM, draft checks, template, follow-ups
+leads/send.py       SMTP
+leads/inbox.py      replies, opt-outs, bounces (IMAP)
+leads/pipeline.py   the run, the scheduler, approve / reject
+templates/, static/ plain HTML + one CSS file
 ```

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.name }}{% endblock %}
+{% block content %}
+{% set r = lead.research %}{% set c = lead.contacts %}
+<h1>{{ lead.name }} <a class="muted small" href="{{ lead.website }}" target="_blank" rel="noopener">{{ lead.domain }} ↗</a></h1>
+<p class="muted">{{ lead.description or (r.summary if r else '') }}</p>
+<p class="muted small">
+  {% if lead.location %}{{ lead.location }} · {% endif %}
+  {% if lead.source_url %}<a href="{{ lead.source_url }}" target="_blank" rel="noopener">{{ lead.source }}</a>{% else %}{{ lead.source }}{% endif %}
+  {% for s in lead.signals %} · {{ s }}{% endfor %}
+</p>
+
+<form class="row" method="post" action="{{ url_for('update_lead', lead_id=lead.id) }}">
+  <select name="status">{% for st in stages %}<option {% if st == lead.status %}selected{% endif %}>{{ st }}</option>{% endfor %}</select>
+  <label>Follow up <input type="date" name="follow_up" value="{{ lead.follow_up or '' }}"></label>
+  <button>Save</button>
+  {% if lead.note %}<span class="muted">{{ lead.note }}</span>{% endif %}
+</form>
+
+{% for m in messages if m.status == 'pending' %}
+  <h2>Draft</h2>{% include "_draft.html" %}
+{% endfor %}
+
+<div class="cols">
+  <section>
+    <h2>Problems found</h2>
+    {% if r %}
+      <p class="small">
+        Website <b>{{ r.scores.website }}</b> · Systems <b>{{ r.scores.systems }}</b> ·
+        pitch: <b>{{ 'Digital Experiences' if r.recommended == 'website' else 'Intelligent Systems' }}</b>
+      </p>
+      <ul class="problems">
+        {% for p in r.problems %}<li><span class="tag">{{ p.service }}</span> {{ p.problem }}
+          <a class="muted small" href="{{ p.url }}" target="_blank" rel="noopener">source</a></li>
+        {% else %}<li class="muted">No problems detected.</li>{% endfor %}
+      </ul>
+      <details><summary class="muted small">{{ r.pages|length }} pages read</summary>
+        <ul class="small">{% for p in r.pages %}<li>{{ p.kind }} — <a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.url }}</a></li>{% endfor %}</ul>
+      </details>
+    {% else %}<p class="muted">Not researched yet.</p>{% endif %}
+  </section>
+
+  <section>
+    <h2>Contacts</h2>
+    {% if c %}
+      <ul class="small">
+        {% for e in c.emails %}<li>{{ e.email }}{% if e.email == c.best_email %} <span class="tag">best</span>{% endif %}
+          <a class="muted" href="{{ e.found_on }}" target="_blank" rel="noopener">found here</a></li>{% endfor %}
+        {% for k, v in c.socials.items() %}<li>{{ k }}: <a href="{{ v }}" target="_blank" rel="noopener">{{ v }}</a></li>{% endfor %}
+        {% if not c.emails and not c.socials %}<li class="muted">Nothing published on their site.</li>{% endif %}
+      </ul>
+    {% else %}<p class="muted">—</p>{% endif %}
+
+    <h2>Notes</h2>
+    <form method="post" action="{{ url_for('add_note', lead_id=lead.id) }}" class="stack">
+      <textarea name="body" rows="2" placeholder="Replied, wants a call next week…"></textarea>
+      <button>Add note</button>
+    </form>
+    <ul class="notes">
+      {% for n in notes %}<li><span class="muted small">{{ n.created_at[:16].replace('T', ' ') }}</span><br>{{ n.body }}</li>{% endfor %}
+    </ul>
+  </section>
+</div>
+
+{% set past = messages|rejectattr('status', 'equalto', 'pending')|list %}
+{% if past %}
+<h2>Messages</h2>
+{% for m in past %}
+  <details class="sent"><summary>{{ m.status }} · {{ m.channel }} to {{ m.recipient }} · {{ (m.sent_at or m.created_at)[:10] }}
+    {% if m.error %}<span class="muted">— {{ m.error }}</span>{% endif %}</summary>
+    <pre>{% if m.subject %}{{ m.subject }}
+
+{% endif %}{{ m.body }}</pre></details>
+{% endfor %}
+{% endif %}
+
+<div class="row danger">
+  <form method="post" action="{{ url_for('research_again', lead_id=lead.id) }}"><button>Research again</button></form>
+  <form method="post" action="{{ url_for('block_lead', lead_id=lead.id) }}"><button class="quiet">Do not contact</button></form>
+  <form method="post" action="{{ url_for('delete_lead', lead_id=lead.id) }}" onsubmit="return confirm('Delete this lead?')"><button class="quiet">Delete</button></form>
+</div>
+{% endblock %}
